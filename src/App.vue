@@ -85,7 +85,7 @@ import { ref, computed } from 'vue';
 
 const teamMembers = [
   {
-    name: 'Test Doe',
+    name: 'Test Doe Test',
     tasks: [
       {
         id: 1,
