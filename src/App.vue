@@ -162,7 +162,7 @@ const teamMembers = [
 ];
 
 // Chart dimensions
-const chartWidth = 1200;
+const chartWidth = 1500;
 const rowHeight = 60;
 const taskHeight = 35;
 const chartHeight = computed(() => {
