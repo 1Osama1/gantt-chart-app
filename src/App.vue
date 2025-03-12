@@ -1,6 +1,13 @@
 <template>
   <div class="gantt-container">
     <svg :width="chartWidth" :height="chartHeight">
+      <!-- Define a shadow filter -->
+      <defs>
+        <filter id="task-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="rgba(0, 0, 0, 0.1)" />
+        </filter>
+      </defs>
+
       <!-- Time axis -->
       <g v-for="(date, index) in timelineDates" :key="date.getTime()">
         <line 
@@ -32,7 +39,6 @@
 
         <!-- Separator line between team members -->
         <line
-        style="margin: 50px;"
           x1="0"
           :y1="getYPosition(memberIndex) -5"
           x2="100%"
@@ -47,27 +53,77 @@
           :key="task.id"
         >
           <rect
-            :x="getXPosition(task.startDate)"
-            :y="getYPosition(memberIndex) + (taskIndex * 35)"
-            :width="getTaskWidth(task)"
-            height="30"
-            :fill="getPriorityColor(task.priority)"
-            rx="4"
-            class="task-bar"
-            @mouseenter="showTooltip(task)"
-            @mouseleave="hideTooltip"
-          />
-          <text
-            :x="getXPosition(task.startDate) + 5"
-            :y="getYPosition(memberIndex) + (taskIndex * 35) + 20"
-            class="task-label"
-            :fill="getTextColor(getPriorityColor(task.priority), task.priority)"
-          >
-            {{ task.name }} (P{{ task.priority }})
-          </text>
+  :x="getXPosition(task.startDate)"
+  :y="getYPosition(memberIndex, taskIndex)"
+  :width="getTaskWidth(task)"
+  height="30"
+  :fill="getPriorityColor(task.priority)"
+  rx="4"
+  class="task-bar"
+  filter="url(#task-shadow)" 
+  stroke="#808080" 
+  stroke-width="1" 
+  @mouseenter="showTooltip(task)"
+  @mouseleave="hideTooltip"
+/>
+<text
+  :x="getXPosition(task.startDate) + 5"
+  :y="getYPosition(memberIndex, taskIndex) + 20"
+  class="task-label"
+  :fill="getTextColor(getPriorityColor(task.priority), task.priority)"
+>
+  {{ task.name }} (P{{ task.priority }})
+</text>
         </g>
       </g>
     </svg>
+
+    <!-- Password Input -->
+    <div v-if="!isAuthenticated" class="password-form">
+      <input
+        type="password"
+        v-model="password"
+        placeholder="Enter password to add tasks"
+        @keyup.enter="checkPassword"
+      />
+      <button @click="checkPassword">Submit</button>
+      <p v-if="passwordError" class="error">{{ passwordError }}</p>
+    </div>
+
+    <!-- Task Entry Form -->
+    <div v-if="isAuthenticated" class="task-form">
+      <h3>Add New Task</h3>
+      <label for="member">Team Member:</label>
+      <select v-model="newTask.member" id="member">
+        <option v-for="member in teamMembers" :key="member.name" :value="member.name">
+          {{ member.name }}
+        </option>
+      </select>
+
+      <label for="taskName">Task Name:</label>
+      <input v-model="newTask.name" id="taskName" placeholder="Task Name" />
+
+      <label for="startDate">Start Date:</label>
+      <input v-model="newTask.startDate" type="date" id="startDate" />
+
+      <label for="endDate">End Date:</label>
+      <input v-model="newTask.endDate" type="date" id="endDate" />
+
+      <label for="priority">Priority (1-10):</label>
+      <input v-model="newTask.priority" type="number" min="1" max="10" id="priority" />
+
+      <label for="notes">Notes:</label>
+      <textarea v-model="newTask.notes" id="notes" placeholder="Additional notes"></textarea>
+
+      <button @click="addTask">Add Task</button>
+    </div>
+    <div v-if="isAuthenticated" class="team-member-form">
+  <h3>Add New Team Member</h3>
+  <input v-model="newMemberName" placeholder="Enter member name" />
+  <button @click="addTeamMember">Add Member</button>
+  <p v-if="teamMemberError" class="error">{{ teamMemberError }}</p>
+</div>
+
 
     <!-- Tooltip -->
     <div v-if="activeTooltip" class="tooltip" :style="tooltipPosition">
@@ -81,107 +137,158 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed , onMounted} from 'vue';
+import { db, collection, getDocs, setDoc, doc } from './firebase';
 
-const teamMembers = [
-  {
-    name: 'Test Doe Test',
-    tasks: [
-      {
-        id: 1,
-        name: 'Design Homepage',
-        startDate: '2024-03-01',
-        endDate: '2024-03-05',
-        priority: 8,
-        notes: 'Need client approval'
-      },
-      {
-        id: 2,
-        name: 'No',
-        startDate: '2024-03-05',
-        endDate: '2024-03-07',
-        priority: 4,
-        notes: 'Need client approval'
-      },
-      // More tasks...
-    ]
-  },
-  {
-    name: 'John Bro',
-    tasks: [
-      {
-        id: 3,
-        name: 'Design Homepage',
-        startDate: '2024-03-01',
-        endDate: '2024-03-05',
-        priority: 8,
-        notes: 'Need client approval'
-      },
-      {
-        id: 2,
-        name: 'No',
-        startDate: '2024-03-05',
-        endDate: '2024-03-07',
-        priority: 4,
-        notes: 'Need client approval'
-      },
-      // More tasks...
-    ]
-  },
-  {
-    name: 'John Snow',
-    tasks: [
-      {
-        id: 3,
-        name: 'Design Homepage',
-        startDate: '2024-03-01',
-        endDate: '2024-03-05',
-        priority: 1,
-        notes: 'Need client approval'
-      },
-      {
-        id: 4,
-        name: 'No',
-        startDate: '2024-03-05',
-        endDate: '2024-03-07',
-        priority: 10,
-        notes: 'Need client approval'
-      },
-      {
-        id: 5,
-        name: 'Nos',
-        startDate: '2024-03-08',
-        endDate: '2024-03-09',
-        priority: 5,
-        notes: 'Need client approval'
-      },
-      // More tasks...
-    ]
-  },
-  // More team members...
-];
 
-// Chart dimensions
-const chartWidth = 1500;
-const rowHeight = 60;
-const taskHeight = 35;
-const chartHeight = computed(() => {
-  const totalTasks = teamMembers.reduce((acc, member) => acc + member.tasks.length, 0);
-  return totalTasks * taskHeight + 100; // Add some padding
+const teamMembers = ref([]);
+const loadTasks = async () => {
+  const querySnapshot = await getDocs(collection(db, "tasks"));
+  teamMembers.value = querySnapshot.docs.map(doc => ({
+    name: doc.data().name,
+    tasks: doc.data().tasks || [] // Ensure tasks exist
+  }));
+};
+
+import { updateDoc, arrayUnion } from "firebase/firestore";
+
+const saveTasks = async () => {
+  for (const member of teamMembers.value) {
+    await updateDoc(doc(db, "tasks", member.name), {
+      tasks: arrayUnion(...member.tasks) // Append tasks instead of overwriting
+    });
+  }
+};
+
+
+// Password and Authentication
+const password = ref('');
+const isAuthenticated = ref(false);
+const passwordError = ref('');
+
+
+const newMemberName = ref('');
+const teamMemberError = ref('');
+
+const addTeamMember = async () => {
+  if (!newMemberName.value.trim()) {
+    teamMemberError.value = 'Member name cannot be empty';
+    return;
+  }
+
+  const memberName = newMemberName.value.trim();
+  const memberRef = doc(db, "tasks", memberName);
+
+  try {
+    // Save new member with an empty task list
+    await setDoc(memberRef, {
+      name: memberName,
+      tasks: []
+    });
+
+    // Update local teamMembers list
+    teamMembers.value.push({ name: memberName, tasks: [] });
+
+    console.log(`Added team member: ${memberName}`);
+    
+    // Clear input field and error message
+    newMemberName.value = '';
+    teamMemberError.value = '';
+  } catch (error) {
+    console.error("Error adding team member:", error);
+    teamMemberError.value = 'Failed to add member. Try again.';
+  }
+};
+
+
+const correctPassword = '940'; // Set your password here
+
+const checkPassword = () => {
+  if (password.value === correctPassword) {
+    isAuthenticated.value = true;
+    passwordError.value = '';
+  } else {
+    passwordError.value = 'Incorrect password. Try again.';
+  }
+};
+
+// New Task Form
+const newTask = ref({
+  member: '',
+  name: '',
+  startDate: '',
+  endDate: '',
+  priority: 1,
+  notes: ''
 });
 
+const addTask = async () => {
+  const member = teamMembers.value.find(m => m.name === newTask.value.member);
+  if (member) {
+    // Add the new task to the member's tasks array
+    member.tasks.push({
+      id: generateUniqueId(),
+      name: newTask.value.name,
+      startDate: newTask.value.startDate,
+      endDate: newTask.value.endDate,
+      priority: newTask.value.priority,
+      notes: newTask.value.notes
+    });
+
+    await saveTasks(); // Save updated data to Firestore ✅
+
+    console.log('Updated teamMembers:', teamMembers.value);
+
+    // Reset form
+    newTask.value = {
+      member: '',
+      name: '',
+      startDate: '',
+      endDate: '',
+      priority: 1,
+      notes: ''
+    };
+  } else {
+    console.error('Selected team member not found');
+  }
+};
+
+function generateUniqueId() {
+  const timestamp = Date.now(); // Current timestamp in milliseconds
+  const randomFactor = Math.floor(Math.random() * 1000); // Random number (0-999)
+  return `${timestamp}-${randomFactor}`; // Combine them to ensure uniqueness
+}
+
+// Chart dimensions
+const chartWidth = 1200;
+const rowHeight = 60;
+const taskHeight = 35;
+// Calculate dynamic chart height
+const chartHeight = computed(() => {
+  let totalHeight = 100; // Add some padding
+  teamMembers.value.forEach(member => {
+    // Each team member's row height is base rowHeight + taskHeight * number of tasks
+    totalHeight += member.tasks.length >0 ?  (member.tasks.length * taskHeight) : rowHeight;
+  });
+  return totalHeight;
+});
 // Tooltip
 const activeTooltip = ref(null);
 const tooltipPosition = ref({ left: '0px', top: '0px' });
 
 // Date calculations
 const timelineDates = computed(() => {
-  const allDates = teamMembers.flatMap(member =>
+  const allDates = teamMembers.value.flatMap(member =>
     member.tasks.flatMap(task => [task.startDate, task.endDate])
   );
   const minDate = new Date(Math.min(...allDates.map(date => new Date(date))));
   const maxDate = new Date(Math.max(...allDates.map(date => new Date(date))));
-  return getDatesBetween(minDate, maxDate);
+  
+  // Add one extra day after the last deadline
+  const extraDay = new Date(maxDate);
+  extraDay.setDate(extraDay.getDate() + 1);
+
+  return getDatesBetween(minDate, extraDay); // Include the extra day
 });
 
 const dateRange = computed(() => {
@@ -208,15 +315,21 @@ const getXPosition = (date) => {
   const daysFromStart = (new Date(date) - dateRange.value.start) / (1000 * 3600 * 24);
   return (daysFromStart / totalDays) * (chartWidth - 200) + 200;
 };
+const getYPosition = (memberIndex, taskIndex = 0) => {
+  let totalHeight = 50; // Initial offset for the timeline
 
-const getYPosition = (memberIndex) => {
-  let totalTasksBefore = 0;
+  // Calculate the height of all previous team members' rows
   for (let i = 0; i < memberIndex; i++) {
-    totalTasksBefore += teamMembers[i].tasks.length;
-  }
-  return totalTasksBefore * taskHeight + 50;
-};
+    const member = teamMembers.value[i];
+        totalHeight += member.tasks.length >0 ?  (member.tasks.length * taskHeight) + 10 : rowHeight;
 
+  }
+
+  // Add the height of the current team member's tasks up to the current task
+  totalHeight += taskIndex * taskHeight;
+
+  return totalHeight;
+};
 const getTaskWidth = (task) => {
   const start = new Date(task.startDate);
   const end = new Date(task.endDate);
@@ -257,7 +370,11 @@ const showTooltip = (task) => {
 const hideTooltip = () => {
   activeTooltip.value = null;
 };
+
+onMounted(loadTasks);
+
 </script>
+
 
 <style>
 .gantt-container {
@@ -314,5 +431,68 @@ const hideTooltip = () => {
     --background-color: #121212;
     --text-color: #ffffff;
   }
+}
+.password-form {
+  margin-bottom: 1rem;
+}
+
+.password-form input {
+  padding: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.password-form button {
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.password-form button:hover {
+  background-color: #0056b3;
+}
+
+.error {
+  color: red;
+  margin-top: 0.5rem;
+}
+
+.task-form {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.task-form label {
+  display: block;
+  margin-top: 0.5rem;
+}
+
+.task-form input,
+.task-form select,
+.task-form textarea {
+  width: 100%;
+  padding: 0.5rem;
+  margin-top: 0.25rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.task-form button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.task-form button:hover {
+  background-color: #218838;
 }
 </style>
