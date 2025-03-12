@@ -324,7 +324,7 @@ const getYPosition = (memberIndex, taskIndex = 0) => {
         totalHeight += member.tasks.length >0 ?  (member.tasks.length * taskHeight) + 10 : rowHeight;
 
   }
-
+// Add some padding between team members
   // Add the height of the current team member's tasks up to the current task
   totalHeight += taskIndex * taskHeight;
 
