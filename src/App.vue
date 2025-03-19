@@ -8,6 +8,18 @@
         </filter>
       </defs>
 
+      <!-- Weekend Shading -->
+      <g v-for="(date, index) in timelineDates" :key="date.getTime()">
+        <rect
+          v-if="isWeekend(date)"
+          :x="getXPosition(date)"
+          y="30"
+          :width="getXPosition(new Date(date.getTime() + 86400000)) - getXPosition(date)"
+          :height="chartHeight - 30"
+          fill="rgba(0, 0, 0, 0.05)"
+        />
+      </g>
+
       <!-- Time axis -->
       <g v-for="(date, index) in timelineDates" :key="date.getTime()">
         <line 
@@ -53,27 +65,27 @@
           :key="task.id"
         >
           <rect
-  :x="getXPosition(task.startDate)"
-  :y="getYPosition(memberIndex, taskIndex)"
-  :width="getTaskWidth(task)"
-  height="30"
-  :fill="getPriorityColor(task.priority)"
-  rx="4"
-  class="task-bar"
-  filter="url(#task-shadow)" 
-  stroke="#808080" 
-  stroke-width="1" 
-  @mouseenter="showTooltip(task)"
-  @mouseleave="hideTooltip"
-/>
-<text
-  :x="getXPosition(task.startDate) + 5"
-  :y="getYPosition(memberIndex, taskIndex) + 20"
-  class="task-label"
-  :fill="getTextColor(getPriorityColor(task.priority), task.priority)"
->
-  {{ task.name }} (P{{ task.priority }})
-</text>
+            :x="getXPosition(task.startDate)"
+            :y="getYPosition(memberIndex, taskIndex)"
+            :width="getTaskWidth(task)"
+            height="30"
+            :fill="getPriorityColor(task.priority)"
+            rx="4"
+            class="task-bar"
+            filter="url(#task-shadow)" 
+            stroke="#808080" 
+            stroke-width="1" 
+            @mouseenter="showTooltip(task)"
+            @mouseleave="hideTooltip"
+          />
+          <text
+            :x="getXPosition(task.startDate) + 5"
+            :y="getYPosition(memberIndex, taskIndex) + 20"
+            class="task-label"
+            :fill="getTextColor(getPriorityColor(task.priority), task.priority)"
+          >
+            {{ task.name }} (P{{ task.priority }})
+          </text>
         </g>
       </g>
     </svg>
@@ -118,12 +130,11 @@
       <button @click="addTask">Add Task</button>
     </div>
     <div v-if="isAuthenticated" class="team-member-form">
-  <h3>Add New Team Member</h3>
-  <input v-model="newMemberName" placeholder="Enter member name" />
-  <button @click="addTeamMember">Add Member</button>
-  <p v-if="teamMemberError" class="error">{{ teamMemberError }}</p>
-</div>
-
+      <h3>Add New Team Member</h3>
+      <input v-model="newMemberName" placeholder="Enter member name" />
+      <button @click="addTeamMember">Add Member</button>
+      <p v-if="teamMemberError" class="error">{{ teamMemberError }}</p>
+    </div>
 
     <!-- Tooltip -->
     <div v-if="activeTooltip" class="tooltip" :style="tooltipPosition">
@@ -295,6 +306,11 @@ const dateRange = computed(() => {
   const dates = timelineDates.value;
   return { start: dates[0], end: dates[dates.length - 1] };
 });
+
+const isWeekend = (date) => {
+  const dayOfWeek = new Date(date).getDay();
+  return dayOfWeek === 5 || dayOfWeek === 6; // 5 = Friday, 6 = Saturday
+};
 
 // Color scaling for priority (10 = red, 1 = green)
 const getPriorityColor = (priority) => {
