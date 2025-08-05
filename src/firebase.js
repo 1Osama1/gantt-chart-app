@@ -11,7 +11,8 @@ const firebaseConfig = {
   storageBucket: "gantt-chart-68458.firebasestorage.app",
   messagingSenderId: "29991334340",
   appId: "1:29991334340:web:69af9bb3196ef28d9b3491",
-  measurementId: "G-XECTYYL0Z3"
+  measurementId: "G-XECTYYL0Z3",
+  adminPasswordHash: "777"
 };
 
 // Initialize Firebase
