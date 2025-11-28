@@ -20,7 +20,6 @@
               <filter id="task-shadow" x="-20%" y="-20%" width="140%" height="140%">
                 <feDropShadow dx="3" dy="3" stdDeviation="3" flood-color="rgba(0, 0, 0, 0.15)" />
               </filter>
-              
               <linearGradient id="headerGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" style="stop-color:#f8f9fa;stop-opacity:1" />
                 <stop offset="100%" style="stop-color:#e9ecef;stop-opacity:1" />
@@ -45,19 +44,19 @@
                 fill="rgba(108, 117, 125, 0.1)"
                 class="weekend-shade"
               />
-              
+
               <!-- Grid lines -->
-              <line 
-                :x1="getXPosition(date)" 
-                y1="50" 
-                :x2="getXPosition(date)" 
-                :y2="chartHeight" 
+              <line
+                :x1="getXPosition(date)"
+                y1="50"
+                :x2="getXPosition(date)"
+                :y2="chartHeight"
                 stroke="#dee2e6"
                 stroke-width="1"
               />
-              
+
               <!-- Date labels with smart frequency -->
-              <text 
+              <text
                 v-if="shouldShowLabel(index)"
                 :x="getXPosition(date) + dayWidth/2"
                 :y="isLongRange ? 45 : 30"
@@ -82,11 +81,11 @@
                 fill="#34495e"
                 class="member-background"
               />
-              
+
               <!-- Member name -->
-              <text 
-                x="15" 
-                :y="getYPosition(memberIndex) + 15" 
+              <text
+                x="15"
+                :y="getYPosition(memberIndex) + 15"
                 class="member-name"
                 fill="white"
               >
@@ -104,8 +103,8 @@
               />
 
               <!-- Tasks -->
-              <g 
-                v-for="(task, taskIndex) in sortedTasks(member.tasks)" 
+              <g
+                v-for="(task, taskIndex) in sortedTasks(member.tasks)"
                 :key="task.id"
               >
                 <rect
@@ -116,9 +115,9 @@
                   :fill="getPriorityColor(task.priority)"
                   rx="6"
                   class="task-bar"
-                  filter="url(#task-shadow)" 
-                  stroke="#fff" 
-                  stroke-width="2" 
+                  filter="url(#task-shadow)"
+                  stroke="#fff"
+                  stroke-width="2"
                   @mouseenter="showTooltip(task, $event)"
                   @mouseleave="hideTooltip"
                 />
@@ -151,6 +150,10 @@
               @keyup.enter="checkPassword"
               class="auth-input"
             />
+            <div class="demo-hint">
+              <span class="hint-icon">💡</span>
+              <span class="hint-text">Demo Password: <code class="demo-password">{{ demoPassword }}</code></span>
+            </div>
             <button @click="checkPassword" class="auth-button">
               Access Dashboard
             </button>
@@ -177,7 +180,6 @@
                   </option>
                 </select>
               </div>
-              
               <div class="form-group">
                 <label for="taskName">Task Name</label>
                 <input v-model="newTask.name" id="taskName" placeholder="Enter task name" class="form-control" />
@@ -189,12 +191,10 @@
                 <label for="startDate">Start Date</label>
                 <input v-model="newTask.startDate" type="date" id="startDate" class="form-control" />
               </div>
-
               <div class="form-group">
                 <label for="endDate">End Date</label>
                 <input v-model="newTask.endDate" type="date" id="endDate" class="form-control" />
               </div>
-
               <div class="form-group">
                 <label for="priority">Priority (1-10)</label>
                 <input v-model="newTask.priority" type="number" min="1" max="10" id="priority" class="form-control" />
@@ -205,7 +205,6 @@
               <label for="notes">Notes</label>
               <textarea v-model="newTask.notes" id="notes" placeholder="Additional notes (optional)" class="form-control"></textarea>
             </div>
-
             <button @click="addTask" class="btn-primary mt-2">Add Task</button>
           </div>
         </div>
@@ -266,25 +265,37 @@ import 'bootstrap';
 
 const teamMembers = ref([]);
 
-// Load password from environment variable or Firebase config
+// Load password from environment variable first, then fallback to Firebase
 const getAdminPassword = async () => {
+  // Try to get password from environment variable first
+  const envPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+  
+  if (envPassword) {
+    console.log('Password loaded from environment variable');
+    return envPassword;
+  }
+  
+  // Fallback to Firebase if env variable not found
   try {
+    console.log('Password not found in environment, checking Firebase...');
     const configDoc = await getDocs(collection(db, "config"));
     if (!configDoc.empty) {
       const config = configDoc.docs[0].data();
-      return config.adminPasswordHash || 'default-secure-password-2025';
+      return config.adminPasswordHash;
     }
-    return 'default-secure-password-2025';
+    return false;
   } catch (error) {
     console.error('Error loading admin password:', error);
-    return 'default-secure-password-2025';
+    return false;
   }
 };
 
 const correctPassword = ref('');
+const demoPassword = ref(''); // For displaying in the UI
 
 onMounted(async () => {
   correctPassword.value = await getAdminPassword();
+  demoPassword.value = correctPassword.value || 'Not configured';
   await loadTasks();
 });
 
@@ -310,7 +321,6 @@ const saveTasks = async () => {
 const password = ref('');
 const isAuthenticated = ref(false);
 const passwordError = ref('');
-
 const newMemberName = ref('');
 const teamMemberError = ref('');
 
@@ -330,7 +340,6 @@ const addTeamMember = async () => {
     });
 
     teamMembers.value.push({ name: memberName, tasks: [] });
-
     newMemberName.value = '';
     teamMemberError.value = '';
   } catch (error) {
@@ -396,7 +405,7 @@ const timelineDates = computed(() => {
   const allDates = teamMembers.value.flatMap(member =>
     member.tasks.flatMap(task => [task.startDate, task.endDate])
   );
-  
+
   if (allDates.length === 0) {
     // Default to current month if no tasks
     const today = new Date();
@@ -404,14 +413,14 @@ const timelineDates = computed(() => {
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     return getDatesBetween(startOfMonth, endOfMonth);
   }
-  
+
   const minDate = new Date(Math.min(...allDates.map(date => new Date(date))));
   const maxDate = new Date(Math.max(...allDates.map(date => new Date(date))));
-  
+
   // Add buffer days
   const startBuffer = new Date(minDate);
   startBuffer.setDate(startBuffer.getDate() - 2);
-  
+
   const endBuffer = new Date(maxDate);
   endBuffer.setDate(endBuffer.getDate() + 2);
 
@@ -425,9 +434,9 @@ const dayWidth = computed(() => {
   const minDayWidth = 40;
   const maxDayWidth = 80;
   const totalDays = timelineDates.value.length;
-  
+
   if (totalDays === 0) return minDayWidth;
-  
+
   // Adjust day width based on range length
   if (totalDays <= 14) return maxDayWidth; // 2 weeks or less
   if (totalDays <= 30) return 60; // 1 month or less
@@ -453,10 +462,10 @@ const labelFrequency = computed(() => {
 const shouldShowLabel = (index) => {
   // Always show first and last labels
   if (index === 0 || index === timelineDates.value.length - 1) return true;
-  
   // Show labels according to frequency
   return index % labelFrequency.value === 0;
 };
+
 const formatDate = (date) => {
   const d = new Date(date);
   const dayAbbr = d.toLocaleDateString('en-US', { weekday: 'short' }); // e.g., "Tue"
@@ -527,11 +536,9 @@ const getTextColor = (backgroundColor, priority) => {
 const truncateTaskName = (taskName, taskWidth) => {
   const maxCharsPerPixel = 0.1;
   const maxChars = Math.floor(taskWidth * maxCharsPerPixel);
-  
   if (taskName.length <= maxChars) {
     return taskName;
   }
-  
   return taskName.substring(0, maxChars - 3) + '...';
 };
 
@@ -574,7 +581,7 @@ const getTaskDuration = (task) => {
 
 // Helpers
 const sortedTasks = (tasks) => {
-  return [...tasks].sort((a, b) => 
+  return [...tasks].sort((a, b) =>
     new Date(a.startDate) - new Date(b.startDate)
   );
 };
@@ -582,10 +589,12 @@ const sortedTasks = (tasks) => {
 const getDatesBetween = (startDate, endDate) => {
   const dates = [];
   let currentDate = new Date(startDate);
+
   while (currentDate <= endDate) {
     dates.push(new Date(currentDate));
     currentDate.setDate(currentDate.getDate() + 1);
   }
+
   return dates;
 };
 
@@ -723,154 +732,6 @@ const hideTooltip = () => {
   align-self: flex-end;
 }
 
-.btn-secondary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-}
-
-/* Enhanced Tooltip */
-.tooltip-enhanced {
-  position: absolute;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
-  pointer-events: none;
-  z-index: 1000;
-  min-width: 250px;
-  border: 1px solid #e9ecef;
-}
-
-.tooltip-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem 0.5rem;
-  border-bottom: 1px solid #f1f3f4;
-}
-
-.tooltip-header h4 {
-  margin: 0;
-  color: #2c3e50;
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-
-.priority-badge {
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.tooltip-content {
-  padding: 0.5rem 1.5rem 1.5rem;
-}
-
-.tooltip-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.tooltip-label {
-  font-weight: 600;
-  color: #495057;
-}
-
-.tooltip-notes {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #f1f3f4;
-}
-
-.tooltip-notes p {
-  margin: 0.5rem 0 0 0;
-  color: #6c757d;
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-/* Error Messages */
-.error-message {
-  color: #dc3545;
-  font-size: 0.9rem;
-  margin-top: 0.5rem;
-  margin-bottom: 0;
-  font-weight: 500;
-}
-
-/* Chart scrollbar styling */
-.chart-wrapper::-webkit-scrollbar {
-  height: 8px;
-}
-
-.chart-wrapper::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-}
-
-.chart-wrapper::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 10px;
-}
-
-.chart-wrapper::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .gantt-container {
-    padding: 0 1rem;
-    margin: 1rem auto;
-  }
-  
-  .app-title {
-    font-size: 2rem;
-  }
-  
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-  
-  .auth-card {
-    margin: 1rem;
-    padding: 2rem;
-  }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .gantt-application {
-    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-  }
-  
-  .dashboard-card,
-  .auth-card,
-  .gantt-chart {
-    background: #2c3e50;
-    color: white;
-  }
-  
-  .card-header {
-    background: #34495e;
-  }
-  
-  .form-control {
-    background: #34495e;
-    border-color: #495057;
-    color: white;
-  }
-  
-  .tooltip-enhanced {
-    background: #2c3e50;
-    color: white;
-  }
-
-}
-
 .task-bar:hover {
   opacity: 0.8;
   transform: translateY(-1px);
@@ -914,7 +775,7 @@ const hideTooltip = () => {
   border: 2px solid #e9ecef;
   border-radius: 8px;
   font-size: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   transition: border-color 0.3s ease;
 }
 
@@ -922,6 +783,41 @@ const hideTooltip = () => {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Demo Hint Styles */
+.demo-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #fff3cd 0%, #fff8e1 100%);
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.hint-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.hint-text {
+  color: #856404;
+  font-weight: 500;
+}
+
+.demo-password {
+  background: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: #667eea;
+  border: 1px solid #e9ecef;
+  letter-spacing: 0.5px;
 }
 
 .auth-button {
