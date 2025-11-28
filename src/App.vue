@@ -137,30 +137,58 @@
 
       <!-- Password Input -->
       <div v-if="!isAuthenticated" class="auth-section">
-        <div class="auth-card">
-          <div class="auth-header">
-            <h3>🔐 Admin Access Required</h3>
-            <p>Enter your credentials to manage tasks and team members</p>
-          </div>
-          <div class="auth-form">
-            <input
-              type="password"
-              v-model="password"
-              placeholder="Enter admin password"
-              @keyup.enter="checkPassword"
-              class="auth-input"
-            />
-            <div class="demo-hint">
-              <span class="hint-icon">💡</span>
-              <span class="hint-text">Demo Password: <code class="demo-password">{{ demoPassword }}</code></span>
-            </div>
-            <button @click="checkPassword" class="auth-button">
-              Access Dashboard
-            </button>
-            <p v-if="passwordError" class="error-message">{{ passwordError }}</p>
-          </div>
-        </div>
+    <div class="auth-card">
+      <div class="auth-header">
+        <h3>🔐 Admin Access Required</h3>
+        <p>Enter your credentials to manage tasks and team members</p>
       </div>
+      <div class="auth-form">
+       <div class="password-input-wrapper">
+    <input
+      :type="showPassword ? 'text' : 'password'"
+      v-model="password"
+      placeholder="Enter admin password"
+      @keyup.enter="checkPassword"
+      class="auth-input"
+    />
+    <button 
+      @click="togglePasswordVisibility" 
+      class="password-toggle"
+      type="button"
+      :aria-label="showPassword ? 'Hide password' : 'Show password'"
+    >
+      <svg v-if="!showPassword" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+      <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+      </svg>
+    </button>
+  </div>
+        <div class="demo-hint">
+    <span class="hint-icon">💡</span>
+    <span class="hint-text">Demo Password: <code class="demo-password">{{ demoPassword }}</code></span>
+    <button @click="copyPassword" class="copy-button" type="button" :title="copied ? 'Copied!' : 'Copy password'">
+      <Transition name="copy-icon" mode="out-in">
+        <svg v-if="!copied" key="copy" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <svg v-else key="check" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </Transition>
+    </button>
+  </div>
+        <button @click="checkPassword" class="auth-button">
+          Access Dashboard
+        </button>
+        <p v-if="passwordError" class="error-message">{{ passwordError }}</p>
+      </div>
+    </div>
+  </div>
 
       <!-- Management Dashboard -->
       <div v-if="isAuthenticated" class="management-dashboard">
@@ -264,7 +292,24 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
 
 const teamMembers = ref([]);
+const showPassword = ref(false);
 
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value;
+};
+const copied = ref(false);
+
+const copyPassword = async () => {
+  try {
+    await navigator.clipboard.writeText(demoPassword.value);
+    copied.value = true;
+    setTimeout(() => {
+      copied.value = false;
+    }, 2000);
+  } catch (err) {
+    console.error('Failed to copy password:', err);
+  }
+};
 // Load password from environment variable first, then fallback to Firebase
 const getAdminPassword = async () => {
   // Try to get password from environment variable first
@@ -602,8 +647,8 @@ const getDatesBetween = (startDate, endDate) => {
 const showTooltip = (task, event) => {
   activeTooltip.value = task;
   tooltipPosition.value = {
-    left: (event.pageX + 15) + 'px',
-    top: (event.pageY - 10) + 'px'
+    left: (event.clientX + 15) + 'px',
+    top: (event.clientY - 10) + 'px'
   };
 };
 
@@ -615,10 +660,12 @@ const hideTooltip = () => {
 <style scoped>
 /* Global Styles */
 .gantt-application {
+  max-width: 1280px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 100vh;
+  margin: 2rem auto;
+  padding: 2rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   padding: 0 2rem;
@@ -670,9 +717,10 @@ const hideTooltip = () => {
   align-items: center;
   max-width: 100%;
   width: 100%;
-  margin: 2rem 0;
+  margin: 2rem;
   position: relative;
   overflow: hidden;
+  padding-bottom: 4rem;
 }
 
 /* Chart Wrapper for Centering */
@@ -820,6 +868,63 @@ const hideTooltip = () => {
   letter-spacing: 0.5px;
 }
 
+.copy-button {
+  background: #fff;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #856404;
+  transition: all 0.2s ease;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: 0.25rem;
+  min-width: 36px; /* Constant width */
+  height: 32px; /* Constant height */
+}
+
+.copy-button:hover {
+  background: #fff;
+  border-color: #f59e0b;
+  color: #92400e;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+.copy-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.copy-button svg {
+  display: block;
+}
+
+/* Icon transition animations */
+.copy-icon-enter-active,
+.copy-icon-leave-active {
+  transition: all 0.3s ease;
+}
+
+.copy-icon-enter-from {
+  opacity: 0;
+  transform: scale(0.5) rotate(-180deg);
+}
+
+.copy-icon-leave-to {
+  opacity: 0;
+  transform: scale(0.5) rotate(180deg);
+}
+
+.copy-icon-enter-to,
+.copy-icon-leave-from {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
 .auth-button {
   width: 100%;
   padding: 1rem;
@@ -954,7 +1059,7 @@ const hideTooltip = () => {
 
 /* Enhanced Tooltip */
 .tooltip-enhanced {
-  position: absolute;
+  position: fixed;
   background: white;
   border-radius: 12px;
   box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
@@ -1026,7 +1131,6 @@ const hideTooltip = () => {
 }
 
 
-/* New classes */
 .chart-scroll-container {
   min-width: fit-content;
   position: relative;
@@ -1049,6 +1153,50 @@ const hideTooltip = () => {
 
 .chart-wrapper::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-input-wrapper .auth-input {
+  width: 100%;
+  padding-right: 45px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 45%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+}
+
+.password-toggle:hover {
+  background-color: rgba(100, 116, 139, 0.1);
+  color: #334155;
+}
+
+.password-toggle:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.password-toggle svg {
+  display: block;
 }
 
 /* Responsive Design */
@@ -1099,5 +1247,8 @@ const hideTooltip = () => {
     background: #2c3e50;
     color: white;
   }
+}
+body {
+  background-color: #555;
 }
 </style>
