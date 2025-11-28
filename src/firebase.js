@@ -1,6 +1,6 @@
 
 
-import { getFirestore, collection, getDocs, addDoc, setDoc, doc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, addDoc, setDoc, doc , deleteDoc } from "firebase/firestore";
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 
@@ -21,4 +21,4 @@ const analytics = getAnalytics(app);
 const db = getFirestore(app);
 
 
-export { db, collection, getDocs, addDoc, setDoc, doc };
+export { db, collection, getDocs, addDoc, setDoc, doc, deleteDoc };

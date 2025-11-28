@@ -237,21 +237,69 @@
           </div>
         </div>
 
-        <!-- Team Member Form -->
-        <div class="dashboard-card">
-          <div class="card-header">
-            <h3>👥 Add Team Member</h3>
-          </div>
-          <div class="card-content">
-            <div class="form-row">
-              <div class="form-group flex-grow">
-                <input v-model="newMemberName" placeholder="Enter team member name" class="form-control" />
-              </div>
-              <button @click="addTeamMember" class="btn-secondary">Add Member</button>
-            </div>
-            <p v-if="teamMemberError" class="error-message">{{ teamMemberError }}</p>
+        <!-- Team Member Management -->
+<div class="dashboard-card">
+  <div class="card-header">
+    <h3>👥 Team Members</h3>
+  </div>
+  <div class="card-content">
+    <!-- Add New Member Form -->
+    <div class="form-row">
+      <div class="form-group flex-grow">
+        <input v-model="newMemberName" placeholder="Enter team member name" class="form-control" />
+      </div>
+      <button @click="addTeamMember" class="btn-secondary">Add Member</button>
+    </div>
+    
+    <!-- Members List -->
+    <div class="members-list">
+      <div v-for="member in teamMembers" :key="member.name" class="member-item">
+        <div v-if="editingMember?.name === member.name" class="member-edit-mode">
+          <input 
+            v-model="editMemberName" 
+            class="form-control member-edit-input"
+            @keyup.enter="saveEditMember(member.name)"
+            @keyup.esc="cancelEditMember"
+          />
+          <div class="member-actions">
+            <button @click="saveEditMember(member.name)" class="btn-icon btn-save" title="Save">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </button>
+            <button @click="cancelEditMember" class="btn-icon btn-cancel" title="Cancel">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
         </div>
+        
+        <div v-else class="member-view-mode">
+          <span class="member-name-text">{{ member.name }}</span>
+          <span class="member-task-count">{{ member.tasks.length }} task(s)</span>
+          <div class="member-actions">
+            <button @click="startEditMember(member)" class="btn-icon btn-edit" title="Edit">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+<button @click="deleteMember(member)" class="btn-icon btn-delete" title="Delete">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <p v-if="teamMemberError" class="error-message">{{ teamMemberError }}</p>
+  </div>
+</div>
       </div>
 
       <!-- Enhanced Tooltip -->
@@ -282,14 +330,108 @@
         </div>
       </div>
     </div>
+    <!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteMemberModal" tabindex="-1" aria-labelledby="deleteMemberModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header rounded-top">
+        <h5 class="modal-title" id="deleteMemberModalLabel">
+          <span class="modal-icon">⚠️</span> Confirm Deletion
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-message">
+          Are you sure you want to delete <strong>{{ memberToDelete?.name }}</strong> and all their tasks?
+        </p>
+        <p class="modal-warning">This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" @click="confirmDeleteMember" data-bs-dismiss="modal">
+          Delete Member
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { db, collection, getDocs, setDoc, doc } from './firebase';
+import { db, collection, getDocs, setDoc, doc, deleteDoc } from './firebase';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
+import { Modal } from 'bootstrap';
+const memberToDelete = ref(null);
+let deleteModal = null;
+
+const editingMember = ref(null);
+const editMemberName = ref('');
+
+const startEditMember = (member) => {
+  editingMember.value = member;
+  editMemberName.value = member.name;
+};
+
+const cancelEditMember = () => {
+  editingMember.value = null;
+  editMemberName.value = '';
+};
+
+const saveEditMember = async (oldName) => {
+  if (!editMemberName.value.trim()) {
+    teamMemberError.value = 'Member name cannot be empty';
+    return;
+  }
+
+  const newName = editMemberName.value.trim();
+  
+  try {
+    // Delete old document
+    await deleteDoc(doc(db, "tasks", oldName));
+    
+    // Create new document with updated name
+    await setDoc(doc(db, "tasks", newName), {
+      name: newName,
+      tasks: editingMember.value.tasks || []
+    });
+    
+    // Update local state
+    const memberIndex = teamMembers.value.findIndex(m => m.name === oldName);
+    if (memberIndex !== -1) {
+      teamMembers.value[memberIndex].name = newName;
+    }
+    
+    editingMember.value = null;
+    editMemberName.value = '';
+    teamMemberError.value = '';
+  } catch (error) {
+    console.error("Error editing team member:", error);
+    teamMemberError.value = 'Failed to edit member. Try again.';
+  }
+};
+
+const deleteMember = (member) => {
+  memberToDelete.value = member;
+  if (deleteModal) {
+    deleteModal.show();
+  }
+};
+const confirmDeleteMember = async () => {
+  if (!memberToDelete.value) return;
+  
+  try {
+    await deleteDoc(doc(db, "tasks", memberToDelete.value.name));
+    teamMembers.value = teamMembers.value.filter(m => m.name !== memberToDelete.value.name);
+    teamMemberError.value = '';
+    memberToDelete.value = null;
+  } catch (error) {
+    console.error("Error deleting team member:", error);
+    teamMemberError.value = 'Failed to delete member. Try again.';
+  }
+};
 
 const teamMembers = ref([]);
 const showPassword = ref(false);
@@ -342,6 +484,12 @@ onMounted(async () => {
   correctPassword.value = await getAdminPassword();
   demoPassword.value = correctPassword.value || 'Not configured';
   await loadTasks();
+  
+  // Initialize Bootstrap modal
+  const modalElement = document.getElementById('deleteMemberModal');
+  if (modalElement) {
+    deleteModal = new Modal(modalElement);
+  }
 });
 
 const loadTasks = async () => {
@@ -658,17 +806,53 @@ const hideTooltip = () => {
 </script>
 
 <style scoped>
+* {
+  box-sizing: border-box;
+}
+
+.gantt-application {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.app-header {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.gantt-container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.chart-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent horizontal scroll */
+svg.gantt-chart {
+  display: block;
+}
+
 /* Global Styles */
 .gantt-application {
+  width: 100%;
   max-width: 1280px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 2rem auto;
-  padding: 2rem;
+  margin: 0 auto;
+  padding: 0;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  padding: 0 2rem;
+  min-height: 100vh;
+  box-sizing: border-box;
 }
 
 /* Header Styles */
@@ -947,10 +1131,11 @@ const hideTooltip = () => {
 .management-dashboard {
   display: grid;
   gap: 2rem;
+  box-sizing: border-box;
   grid-template-columns: 1fr;
   width: 100%;
   max-width: 800px;
-  margin: 0 auto;
+  margin: 2rem auto;
 }
 
 .dashboard-card {
@@ -1199,56 +1384,792 @@ const hideTooltip = () => {
   display: block;
 }
 
+
+.members-list {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.member-item {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.member-view-mode,
+.member-edit-mode {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.member-name-text {
+  font-weight: 600;
+  color: #2c3e50;
+  flex: 1;
+}
+
+.member-task-count {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.member-edit-input {
+  flex: 1;
+  margin: 0;
+}
+
+.member-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-edit {
+  color: #667eea;
+}
+
+.btn-edit:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.btn-delete {
+  color: #dc3545;
+}
+
+.btn-delete:hover {
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.btn-save {
+  color: #28a745;
+}
+
+.btn-save:hover {
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.btn-cancel {
+  color: #6c757d;
+}
+
+.btn-cancel:hover {
+  background: rgba(108, 117, 125, 0.1);
+}
+/* Modal Customization */
+.modal-content {
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1.5rem;
+  border: none;
+}
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.modal-icon {
+  font-size: 1.5rem;
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+.modal-message {
+  font-size: 1.1rem;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.modal-warning {
+  color: #dc3545;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.modal-footer {
+  padding: 1rem 2rem;
+  border: none;
+}
+
+.btn-close {
+  filter: brightness(0) invert(1);
+}
 /* Responsive Design */
-@media (max-width: 768px) {
-  .gantt-container {
+/* Responsive Design */
+
+/* Large Desktop - 1200px and above */
+@media (min-width: 1200px) {
+  .gantt-application {
+    max-width: 1280px;
+  }
+}
+
+/* Desktop - 992px to 1199px */
+@media (max-width: 1199px) {
+  .gantt-application {
+    max-width: 100%;
+    padding: 0 1.5rem;
+  }
+  
+  .chart-wrapper {
+    overflow-x: auto;
+  }
+  
+  .management-dashboard {
+    max-width: 700px;
+  }
+}
+
+/* Tablet - 768px to 991px */
+@media (max-width: 991px) {
+  .gantt-application {
     padding: 0 1rem;
-    margin: 1rem auto;
   }
   
   .app-title {
     font-size: 2rem;
   }
   
+  .app-subtitle {
+    font-size: 1rem;
+  }
+  
+  .management-dashboard {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+  
+  .dashboard-card {
+    margin: 0 0 1.5rem 0;
+  }
+  
   .form-row {
     grid-template-columns: 1fr;
   }
   
-  .auth-card {
-    margin: 1rem;
-    padding: 2rem;
-  }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .gantt-application {
-    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-  }
-  
-  .dashboard-card,
-  .auth-card,
-  .gantt-chart {
-    background: #2c3e50;
-    color: white;
+  .card-content {
+    padding: 1.5rem;
   }
   
   .card-header {
-    background: #34495e;
+    padding: 1.25rem 1.5rem;
+  }
+}
+
+/* Mobile - 576px to 767px */
+@media (max-width: 767px) {
+  .gantt-application {
+    padding: 0;
+    margin: 0;
+  }
+  
+  /* Header */
+  .app-header {
+    padding: 1.5rem 0;
+  }
+  
+  .header-content {
+    padding: 0 1rem;
+  }
+  
+  .app-title {
+    font-size: 1.75rem;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .title-icon {
+    font-size: 2rem;
+  }
+  
+  .app-subtitle {
+    font-size: 0.95rem;
+    padding: 0 1rem;
+  }
+  
+  /* Chart Container */
+  .gantt-container {
+    padding: 0 1rem;
+    margin: 1rem 0;
+    padding-bottom: 2rem;
+  }
+  
+  .chart-wrapper {
+    width: calc(100vw - 2rem);
+    margin: 0 -1rem;
+    padding: 0 1rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .chart-scroll-container {
+    min-width: 800px; /* Minimum chart width on mobile */
+  }
+  
+  /* Dashboard */
+  .management-dashboard {
+    padding: 0 1rem;
+    width: 100%;
+    gap: 1.5rem;
+  }
+  
+  .dashboard-card {
+    margin: 0 0 1rem 0;
+  }
+  
+  .card-content {
+    padding: 1.25rem;
+  }
+  
+  .card-header {
+    padding: 1rem 1.25rem;
+  }
+  
+  .card-header h3 {
+    font-size: 1.15rem;
+  }
+  
+  /* Forms */
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
   }
   
   .form-control {
-    background: #34495e;
-    border-color: #495057;
-    color: white;
+    padding: 0.75rem;
+    font-size: 16px; /* Prevents iOS zoom */
   }
   
+  .form-group label {
+    font-size: 0.9rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  /* Buttons */
+  .btn-primary,
+  .btn-secondary,
+  .auth-button {
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+  }
+  
+  .btn-secondary {
+    align-self: stretch;
+    margin-top: 0;
+  }
+  
+  /* Auth Section */
+  .auth-section {
+    min-height: 350px;
+    padding: 1rem;
+  }
+  
+  .auth-card {
+    margin: 0;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 400px;
+  }
+  
+  .auth-header h3 {
+    font-size: 1.3rem;
+  }
+  
+  .auth-header p {
+    font-size: 0.95rem;
+  }
+  
+  .auth-input {
+    padding: 0.875rem;
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+  
+  /* Demo Hint */
+  .demo-hint {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+    padding: 0.875rem;
+  }
+  
+  .hint-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .demo-password {
+    display: inline-block;
+    margin-top: 0.25rem;
+  }
+  
+  /* Members List */
+  .members-list {
+    gap: 0.75rem;
+  }
+  
+  .member-item {
+    padding: 0.875rem;
+  }
+  
+  .member-view-mode {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .member-name-text {
+    flex: 1 1 100%;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+  }
+  
+  .member-task-count {
+    flex: 1;
+    font-size: 0.875rem;
+  }
+  
+  .member-actions {
+    gap: 0.375rem;
+  }
+  
+  /* Tooltip */
   .tooltip-enhanced {
-    background: #2c3e50;
-    color: white;
+    max-width: calc(100vw - 2rem);
+    min-width: 220px;
+    font-size: 0.9rem;
+  }
+  
+  .tooltip-header {
+    padding: 0.875rem 1.25rem 0.5rem;
+  }
+  
+  .tooltip-header h4 {
+    font-size: 1.05rem;
+  }
+  
+  .tooltip-content {
+    padding: 0.5rem 1.25rem 1.25rem;
+  }
+  
+  .tooltip-row {
+    font-size: 0.875rem;
+  }
+  
+  /* Modal */
+  .modal-dialog {
+    margin: 1rem;
+  }
+  
+  .modal-content {
+    border-radius: 12px;
+  }
+  
+  .modal-header {
+    padding: 1.25rem;
+  }
+  
+  .modal-body {
+    padding: 1.5rem;
+  }
+  
+  .modal-message {
+    font-size: 1rem;
+  }
+  
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  
+  .modal-footer .btn {
+    width: 100%;
+    margin: 0;
   }
 }
-body {
-  background-color: #555;
+
+/* Small Mobile - 480px to 575px */
+@media (max-width: 575px) {
+  .gantt-application {
+    padding: 0;
+  }
+  
+  /* Header */
+  .app-header {
+    padding: 1.25rem 0;
+  }
+  
+  .header-content {
+    padding: 0 0.75rem;
+  }
+  
+  .app-title {
+    font-size: 1.5rem;
+  }
+  
+  .title-icon {
+    font-size: 1.75rem;
+  }
+  
+  .app-subtitle {
+    font-size: 0.9rem;
+  }
+  
+  /* Chart */
+  .gantt-container {
+    padding: 0 0.75rem;
+    margin: 0.75rem 0;
+  }
+  
+  .chart-wrapper {
+    width: calc(100vw - 1.5rem);
+    margin: 0 -0.75rem;
+    padding: 0 0.75rem;
+  }
+  
+  /* Dashboard */
+  .management-dashboard {
+    padding: 0 0.75rem;
+    gap: 1rem;
+  }
+  
+  .dashboard-card {
+    margin: 0 0 0.75rem 0;
+  }
+  
+  .card-content {
+    padding: 1rem;
+  }
+  
+  .card-header {
+    padding: 0.875rem 1rem;
+  }
+  
+  .card-header h3 {
+    font-size: 1rem;
+  }
+  
+  /* Forms */
+  .form-control {
+    padding: 0.625rem;
+    font-size: 16px;
+  }
+  
+  .form-group label {
+    font-size: 0.85rem;
+  }
+  
+  /* Buttons */
+  .btn-primary,
+  .btn-secondary,
+  .auth-button {
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+  }
+  
+  /* Auth */
+  .auth-section {
+    padding: 0.75rem;
+  }
+  
+  .auth-card {
+    padding: 1.25rem;
+    max-width: 100%;
+  }
+  
+  .auth-header h3 {
+    font-size: 1.2rem;
+  }
+  
+  .auth-header p {
+    font-size: 0.9rem;
+  }
+  
+  .auth-input {
+    padding: 0.75rem;
+  }
+  
+  /* Demo Hint */
+  .demo-hint {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+  }
+  
+  .hint-icon {
+    font-size: 1.1rem;
+  }
+  
+  .copy-button {
+    min-width: 32px;
+    height: 30px;
+  }
+  
+  .copy-button svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  /* Members */
+  .member-item {
+    padding: 0.75rem;
+  }
+  
+  .member-name-text {
+    font-size: 0.95rem;
+  }
+  
+  .member-task-count {
+    font-size: 0.8rem;
+  }
+  
+  .member-actions {
+    gap: 0.25rem;
+  }
+  
+  .btn-icon {
+    padding: 0.4rem;
+  }
+  
+  .btn-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  /* Tooltip */
+  .tooltip-enhanced {
+    min-width: 200px;
+    font-size: 0.85rem;
+  }
+  
+  .tooltip-header {
+    padding: 0.75rem 1rem 0.4rem;
+  }
+  
+  .tooltip-header h4 {
+    font-size: 0.95rem;
+  }
+  
+  .tooltip-content {
+    padding: 0.4rem 1rem 1rem;
+  }
+  
+  .tooltip-row {
+    font-size: 0.8rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .priority-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.4rem;
+  }
+  
+  /* Modal */
+  .modal-dialog {
+    margin: 0.5rem;
+  }
+  
+  .modal-header {
+    padding: 1rem;
+  }
+  
+  .modal-title {
+    font-size: 1.1rem;
+  }
+  
+  .modal-icon {
+    font-size: 1.3rem;
+  }
+  
+  .modal-body {
+    padding: 1.25rem;
+  }
+  
+  .modal-message {
+    font-size: 0.95rem;
+  }
+  
+  .modal-warning {
+    font-size: 0.85rem;
+  }
+  
+  .modal-footer {
+    padding: 0.75rem 1.25rem;
+  }
+}
+
+/* Extra Small Mobile - 360px to 479px */
+@media (max-width: 479px) {
+  .app-title {
+    font-size: 1.35rem;
+  }
+  
+  .title-icon {
+    font-size: 1.5rem;
+  }
+  
+  .app-subtitle {
+    font-size: 0.85rem;
+  }
+  
+  .card-header h3 {
+    font-size: 0.95rem;
+  }
+  
+  .gantt-container {
+    padding: 0 0.5rem;
+  }
+  
+  .management-dashboard {
+    padding: 0 0.5rem;
+  }
+  
+  .chart-wrapper {
+    width: calc(100vw - 1rem);
+    margin: 0 -0.5rem;
+    padding: 0 0.5rem;
+  }
+}
+
+/* Very Small Devices - Below 360px */
+@media (max-width: 359px) {
+  .app-title {
+    font-size: 1.25rem;
+  }
+  
+  .title-icon {
+    font-size: 1.35rem;
+  }
+  
+  .app-subtitle {
+    font-size: 0.8rem;
+  }
+  
+  .auth-card {
+    padding: 1rem;
+  }
+  
+  .card-content {
+    padding: 0.875rem;
+  }
+  
+  .form-control {
+    padding: 0.5rem;
+    font-size: 14px;
+  }
+  
+  .btn-primary,
+  .btn-secondary,
+  .auth-button {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.9rem;
+  }
+  
+  .copy-button {
+    min-width: 28px;
+    height: 26px;
+    padding: 0.25rem 0.3rem;
+  }
+  
+  .copy-button svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* Landscape Orientation - Mobile Devices */
+@media (max-width: 896px) and (orientation: landscape) {
+  .app-header {
+    padding: 1rem 0;
+  }
+  
+  .app-title {
+    font-size: 1.5rem;
+  }
+  
+  .auth-section {
+    min-height: 250px;
+    padding: 0.5rem;
+  }
+  
+  .auth-card {
+    padding: 1rem;
+  }
+  
+  .auth-header {
+    margin-bottom: 0.5rem;
+  }
+  
+  .gantt-container {
+    padding-bottom: 1rem;
+  }
+  
+  .management-dashboard {
+    gap: 1rem;
+  }
+  
+  .modal-dialog {
+    max-width: 500px;
+  }
+}
+
+/* High Resolution Displays */
+@media (min-width: 1440px) {
+  .gantt-application {
+    max-width: 1400px;
+  }
+  
+  .management-dashboard {
+    max-width: 900px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .gantt-application {
+    background: white;
+    padding: 0;
+  }
+  
+  .auth-section,
+  .management-dashboard,
+  .btn-icon {
+    display: none;
+  }
+  
+  .chart-wrapper {
+    overflow: visible;
+  }
+  
+  .gantt-chart {
+    box-shadow: none;
+  }
 }
 </style>
